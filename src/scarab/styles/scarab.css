@@ -1,0 +1,50 @@
+/* Scarab TCSS theme */
+
+Screen {
+    background: $surface;
+}
+
+#main-container {
+    padding: 1 2;
+    min-height: 1fr;
+}
+
+/* Editor */
+SequenceEditorScreen {
+    background: $surface;
+}
+
+LoopSection {
+    border: solid $primary;
+    padding: 1;
+    margin: 1 0;
+}
+
+LoopSection.-expanded {
+    border: solid $primary;
+}
+
+ExerciseRow {
+    padding: 0 1;
+    min-height: 1;
+}
+
+/* Playback */
+PlaybackScreen {
+    background: $surface;
+}
+
+#playback-animation {
+    border: tall $primary;
+    padding: 1;
+    align: center middle;
+}
+
+/* Library */
+LibraryScreen {
+    background: $surface;
+}
+
+.workout-btn {
+    margin: 1 0;
+}

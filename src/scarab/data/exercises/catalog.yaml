@@ -1,0 +1,72 @@
+# Exercise catalog - hand-curated from Darebee and other sources
+
+exercises:
+  - id: jumping_jacks
+    name: Jumping Jacks
+    aliases: [jacks, star jumps]
+    category: cardio
+    difficulty: 2
+    static: false
+
+  - id: high_knees
+    name: High Knees
+    aliases: [running in place]
+    category: cardio
+    difficulty: 2
+    static: false
+
+  - id: pushups
+    name: Push-ups
+    aliases: [push ups, press ups]
+    category: strength
+    difficulty: 3
+    static: false
+
+  - id: mountain_climbers
+    name: Mountain Climbers
+    aliases: [climbers]
+    category: cardio
+    difficulty: 3
+    static: false
+
+  - id: burpees
+    name: Burpees
+    aliases: []
+    category: metcon
+    difficulty: 4
+    static: false
+
+  - id: toe_touches
+    name: Toe Touches
+    aliases: [standing toe touch]
+    category: stretching
+    difficulty: 1
+    static: false
+
+  - id: quad_stretch
+    name: Quad Stretch
+    aliases: [quadriceps stretch]
+    category: stretching
+    difficulty: 1
+    static: true
+
+  - id: plank
+    name: Plank
+    aliases: [front plank, high plank]
+    category: strength
+    difficulty: 2
+    static: true
+
+  - id: squats
+    name: Squats
+    aliases: [bodyweight squats]
+    category: strength
+    difficulty: 2
+    static: false
+
+  - id: lunges
+    name: Lunges
+    aliases: [forward lunges]
+    category: strength
+    difficulty: 2
+    static: false
