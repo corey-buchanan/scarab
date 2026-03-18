@@ -20,9 +20,11 @@ class ExerciseRow(Horizontal):
     ExerciseRow .seconds-input { width: 15; min-width: 10; }
     ExerciseRow .rest-input { width: 15; min-width: 10; }
     ExerciseRow .sets-input { width: 15; min-width: 10; }
-    ExerciseRow .mode-select { width: 14; }
-    ExerciseRow .reps-row.hidden { display: none; }
-    ExerciseRow .timed-row.hidden { display: none; }
+    ExerciseRow .mode-select { width: 15; min-width: 10; }
+    ExerciseRow .reps-label.hidden,
+    ExerciseRow .reps-input.hidden,
+    ExerciseRow .timed-label.hidden,
+    ExerciseRow .seconds-input.hidden { display: none; }
     """
 
     def __init__(
@@ -51,7 +53,7 @@ class ExerciseRow(Horizontal):
         yield inp
         yield AutoComplete(inp, items)
         if self.show_sets:
-            yield Label("sets:")
+            yield Label("Sets:")
             yield Input(
                 value=str(self.ref.sets),
                 placeholder="1",
@@ -60,19 +62,19 @@ class ExerciseRow(Horizontal):
             )
         yield Label("Type:")
         yield Select(
-            [("Reps", "reps"), ("Timed (seconds)", "timed")],
+            [("Reps", "reps"), ("Timed (s)", "timed")],
             value="timed" if self._is_timed else "reps",
             classes="mode-select",
         )
         reps_val = str(self.ref.reps)
         sec_val = str(self.ref.hold_sec or 30)
-        with Horizontal(classes="reps-row" + (" hidden" if self._is_timed else "")):
-            yield Label("reps:")
-            yield Input(value=reps_val, placeholder="10", type="integer", classes="reps-input")
-        with Horizontal(classes="timed-row" + (" hidden" if not self._is_timed else "")):
-            yield Label("sec:")
-            yield Input(value=sec_val, placeholder="30", type="integer", classes="seconds-input")
-        yield Label("rest:")
+        hidden_reps = " hidden" if self._is_timed else ""
+        hidden_timed = " hidden" if not self._is_timed else ""
+        yield Label("Reps:", classes="reps-label" + hidden_reps)
+        yield Input(value=reps_val, placeholder="10", type="integer", classes="reps-input" + hidden_reps)
+        yield Label("Seconds:", classes="timed-label" + hidden_timed)
+        yield Input(value=sec_val, placeholder="30", type="integer", classes="seconds-input" + hidden_timed)
+        yield Label("Rest:")
         yield Input(
             value="" if self.ref.rest_sec == 0 else str(self.ref.rest_sec),
             placeholder="0",
@@ -85,14 +87,10 @@ class ExerciseRow(Horizontal):
     def on_select_changed(self, event: Select.Changed) -> None:
         value = str(event.value) if event.value is not None else "reps"
         is_timed = value == "timed"
-        reps_row = self.query_one(".reps-row", Horizontal)
-        timed_row = self.query_one(".timed-row", Horizontal)
-        if is_timed:
-            reps_row.add_class("hidden")
-            timed_row.remove_class("hidden")
-        else:
-            reps_row.remove_class("hidden")
-            timed_row.add_class("hidden")
+        for node in self.query(".reps-label, .reps-input"):
+            node.add_class("hidden") if is_timed else node.remove_class("hidden")
+        for node in self.query(".timed-label, .seconds-input"):
+            node.remove_class("hidden") if is_timed else node.add_class("hidden")
 
     def get_ref(self) -> ExerciseRef:
         """Build ExerciseRef from current inputs."""

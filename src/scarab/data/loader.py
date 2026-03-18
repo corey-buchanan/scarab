@@ -36,10 +36,9 @@ def get_exercise_by_id(catalog: list[Exercise], exercise_id: str) -> Exercise | 
 
 
 def catalog_autocomplete_items(catalog: list[Exercise]) -> list[str]:
-    """Return list of searchable strings for autocomplete (id, name, aliases)."""
+    """Return list of searchable strings for autocomplete (id, name)."""
     items: list[str] = []
     for ex in catalog:
         items.append(ex.id)
         items.append(ex.name)
-        items.extend(ex.aliases)
     return list(dict.fromkeys(items))  # preserve order, dedupe

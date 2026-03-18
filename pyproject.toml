@@ -32,5 +32,9 @@ scarab = "scarab.app:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/scarab"]
 
+[tool.pyright]
+reportMissingImports = false
+reportMissingModuleSource = false
+
 [tool.hatch.build.targets.sdist]
 include = ["src/scarab", "README.md"]

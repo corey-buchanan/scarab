@@ -22,15 +22,15 @@ items:
     items:
       - type: superset
         label: Torture
-        sets: 3
+        sets: 1
         items:
           - type: exercise
             id: burpees
             sets: 1
-            reps: 1
-            rest_sec: 30
+            reps: 10
+            rest_sec: 0
             notes: ''
-            hold_sec: 10
+        rest_between_sets: 30
       - type: exercise
         id: pushups
         sets: 1

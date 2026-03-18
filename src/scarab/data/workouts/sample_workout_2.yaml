@@ -1,0 +1,19 @@
+name: Sample Workout 2
+items:
+  - type: superset
+    label:
+    sets: 3
+    items:
+      - type: exercise
+        id: Toe Touches
+        sets: 1
+        reps: 10
+        rest_sec: 30
+        notes: ''
+      - type: exercise
+        id: burpees
+        sets: 1
+        reps: 1
+        rest_sec: 0
+        notes: ''
+        hold_sec: 30

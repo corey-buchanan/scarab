@@ -364,11 +364,26 @@ class SequenceEditorScreen(Container):
             )
 
     def _rebuild_and_reselect(self) -> None:
-        """Rebuild tree and keep current selection if still valid."""
+        """Rebuild tree and keep current selection if still valid. Selects the node in the tree."""
         path = self._selected_path
         self._build_tree()
         self._selected_path = path
         self._update_detail()
+        if path is not None and not _is_end_path(path):
+            self.call_later(self._select_node_at_path, path)
+
+    def _select_node_at_path(self, path: tuple[int, ...]) -> None:
+        """Find and select the tree node at the given path. Expands parents so it's visible."""
+        tree = self.query_one("#editor-tree", SequenceTree)
+        node = tree.root
+        for i, idx in enumerate(path):
+            children = list(node.children)
+            if idx < 0 or idx >= len(children):
+                return
+            node = children[idx]
+            if i < len(path) - 1:
+                node.expand()
+        tree.select_node(node)
 
     def _schedule_tree_refresh(self) -> None:
         """Debounce: persist and refresh tree after input changes."""
@@ -462,7 +477,7 @@ class SequenceEditorScreen(Container):
             path = self.workout_path or WORKOUTS_DIR / f"{self._slug(self.workout.name)}.yaml"
             self.workout.to_yaml(path)
             self.workout_path = path
-            self.notify(f"Saved to {path}", severity="information")
+            self.notify(f"Saved successfully", severity="information")
 
         elif btn_id == "back":
             self._persist_current_detail()

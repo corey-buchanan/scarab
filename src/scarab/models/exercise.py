@@ -8,7 +8,6 @@ class Exercise(BaseModel):
 
     id: str = Field(..., description="Unique ID, e.g. jumping_jacks")
     name: str = Field(..., description="Display name")
-    aliases: list[str] = Field(default_factory=list, description="Alternative names for search")
     category: str = Field(default="general", description="cardio, strength, metcon, hiit, combat, stretching, yoga, wellness")
     difficulty: int = Field(default=3, ge=1, le=5, description="1=Light to 5=Advanced")
     static: bool = Field(default=False, description="True for holds (e.g. plank), False for dynamic")
