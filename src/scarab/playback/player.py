@@ -1,10 +1,10 @@
-"""Playback engine - iterates loops and exercises with timer."""
+"""Playback engine - iterates workout items (exercises and super-sets) with timer."""
 
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-from scarab.models.workout import ExerciseRef, Loop, Workout
+from scarab.models.workout import ExerciseRef, SuperSet, Workout, WorkoutItem
 
 
 class PlaybackState(Enum):
@@ -18,7 +18,7 @@ class PlaybackState(Enum):
 @dataclass
 class PlaybackItem:
     """Single item to perform (exercise or rest)."""
-    loop_label: str | None
+    superset_label: str | None
     set_num: int
     exercise: ExerciseRef
     is_rest: bool = False
@@ -27,27 +27,68 @@ class PlaybackItem:
 @dataclass
 class PlaybackProgress:
     """Current playback position."""
-    loop_idx: int = 0
-    set_num: int = 1
-    exercise_idx: int = 0
     item_idx: int = 0
+    set_num: int = 1
     items: list[PlaybackItem] = field(default_factory=list)
+
+
+def _flatten_one_round(
+    items: list[WorkoutItem],
+    level: int,
+    parent_label: str | None,
+) -> list[PlaybackItem]:
+    """One round of items (no set replication). Nested SuperSets are fully expanded."""
+    out: list[PlaybackItem] = []
+    for item in items:
+        if isinstance(item, ExerciseRef):
+            out.append(PlaybackItem(
+                superset_label=parent_label,
+                set_num=1,
+                exercise=item,
+                is_rest=False,
+            ))
+        elif isinstance(item, SuperSet):
+            nested = _flatten_one_round(item.items, level, item.label)
+            sets_count = item.get_sets_for_level(level)
+            for s in range(1, sets_count + 1):
+                for p in nested:
+                    out.append(PlaybackItem(
+                        superset_label=p.superset_label or item.label,
+                        set_num=s,
+                        exercise=p.exercise,
+                        is_rest=False,
+                    ))
+        else:
+            raise TypeError(f"Unexpected item type: {type(item)}")
+    return out
 
 
 def build_playback_items(workout: Workout, level: int) -> list[PlaybackItem]:
     """Flatten workout into ordered items for playback. Exercises only (no rest steps)."""
-    items: list[PlaybackItem] = []
-    for loop in workout.loops:
-        sets_count = loop.get_sets_for_level(level)
-        for s in range(1, sets_count + 1):
-            for ex in loop.exercises:
-                items.append(PlaybackItem(
-                    loop_label=loop.label,
+    out: list[PlaybackItem] = []
+    for item in workout.items:
+        if isinstance(item, ExerciseRef):
+            for s in range(1, item.sets + 1):
+                out.append(PlaybackItem(
+                    superset_label=None,
                     set_num=s,
-                    exercise=ex,
+                    exercise=item,
                     is_rest=False,
                 ))
-    return items
+        elif isinstance(item, SuperSet):
+            one_round = _flatten_one_round(item.items, level, item.label)
+            sets_count = item.get_sets_for_level(level)
+            for s in range(1, sets_count + 1):
+                for p in one_round:
+                    out.append(PlaybackItem(
+                        superset_label=p.superset_label or item.label,
+                        set_num=s,
+                        exercise=p.exercise,
+                        is_rest=False,
+                    ))
+        else:
+            raise TypeError(f"Unexpected item type: {type(item)}")
+    return out
 
 
 class PlaybackEngine:

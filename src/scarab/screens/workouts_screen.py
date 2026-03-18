@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from textual.containers import Container, Vertical, ScrollableContainer
-from textual.widgets import Button, Label, Static
+from textual.widgets import Button, Label
 
 from scarab.data import WORKOUTS_DIR
 from scarab.models.workout import Workout
@@ -12,16 +12,7 @@ from scarab.models.workout import Workout
 class WorkoutsScreen(Container):
     """List workouts, select one, start playback. Replaces Library + Playback."""
 
-    DEFAULT_CSS = """
-    WorkoutsScreen {
-        padding: 1 2;
-        height: 1fr;
-    }
-    #workouts-header { height: auto; padding: 1 0; }
-    #workouts-list { height: 1fr; overflow-y: auto; }
-    #workouts-actions { height: auto; padding: 1 0; }
-    .workout-btn { width: 100%; margin: 1 0; }
-    """
+    DEFAULT_CSS = ""
 
     def compose(self):
         from textual.app import ComposeResult

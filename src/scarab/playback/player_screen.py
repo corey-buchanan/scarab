@@ -5,10 +5,9 @@ from pathlib import Path
 from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Button, Label, Static
 
-from scarab.data import WORKOUTS_DIR
 from scarab.data.loader import get_exercise_by_id, load_exercise_catalog
 from scarab.models.workout import Workout
-from scarab.playback.player import PlaybackEngine, PlaybackItem, PlaybackState
+from scarab.playback.player import PlaybackEngine, PlaybackItem
 from scarab.playback.animation import AnimationWidget
 from scarab.playback.stat_tracker import (
     compute_workout_points,
@@ -20,19 +19,7 @@ from scarab.playback.stat_tracker import (
 class PlaybackScreen(Container):
     """Play workout with ASCII animation and timer."""
 
-    DEFAULT_CSS = """
-    PlaybackScreen {
-        padding: 1 2;
-        height: 1fr;
-    }
-    #playback-header { height: auto; padding: 1 0; }
-    .playback-animation {
-        height: 1fr;
-        min-height: 10;
-        overflow: hidden;
-    }
-    #playback-controls { height: auto; padding: 1 0; }
-    """
+    DEFAULT_CSS = ""
 
     def __init__(self, workout_path: Path | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -93,8 +80,8 @@ class PlaybackScreen(Container):
         label_text = f"{ex.id}: {ex.reps} reps"
         if ex.rest_sec > 0:
             label_text += f" (rest {ex.rest_sec}s after)"
-        if item.loop_label:
-            label_text = f"[{item.loop_label}] Set {item.set_num} — {label_text}"
+        if item.superset_label:
+            label_text = f"[{item.superset_label}] Set {item.set_num} — {label_text}"
         content.mount(Vertical(
             Label(label_text, id=f"exercise-label-{c}"),
             anim,
@@ -111,7 +98,7 @@ class PlaybackScreen(Container):
             return
         # Count exercises (non-rest items)
         exercise_count = sum(1 for i in self.engine.items if not i.is_rest)
-        loop_count = len(set((i.loop_label, i.set_num) for i in self.engine.items if not i.is_rest))
+        loop_count = len(set((i.superset_label, i.set_num) for i in self.engine.items if not i.is_rest))
         points, xp = compute_workout_points(exercise_count, loop_count)
         stats = load_stats()
         stats.add_workout_completion(points, xp, exercise_count)

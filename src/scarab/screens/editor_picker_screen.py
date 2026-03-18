@@ -6,17 +6,14 @@ from textual.containers import Container, Vertical, ScrollableContainer
 from textual.widgets import Button, Input, Label
 
 from scarab.data import WORKOUTS_DIR
-from scarab.models.workout import Workout
+from scarab.models.workout import ExerciseRef, SuperSet, Workout
 
 
 class EditorPickerScreen(Container):
     """Choose existing workout to edit or create new one."""
 
     DEFAULT_CSS = """
-    EditorPickerScreen { padding: 1 2; height: 1fr; }
-    #editor-picker-list { height: 1fr; overflow-y: auto; }
-    .workout-edit-btn { width: 100%; margin: 1 0; }
-    #new-name-input { width: 40; }
+    #new-name-input { width: 40; min-width: 20; }
     """
 
     def compose(self):
@@ -45,7 +42,7 @@ class EditorPickerScreen(Container):
                 name = w.name
             except Exception:
                 name = p.stem
-            btn = Button(f"{name}", id=f"edit-{p.stem}", classes="workout-edit-btn")
+            btn = Button(f"{name}", id=None, classes="workout-edit-btn")
             btn._workout_path = p  # type: ignore
             container.mount(btn)
         if not workouts:
@@ -58,8 +55,11 @@ class EditorPickerScreen(Container):
             name_inp = self.query_one("#new-name-input", Input)
             name = name_inp.value.strip() or "New Workout"
             from scarab.editor.sequence_editor import SequenceEditorScreen
-            from scarab.models.workout import Loop
-            workout = Workout(name=name, loops=[Loop(sets=3, exercises=[])])
+
+            workout = Workout(
+                name=name,
+                items=[SuperSet(sets=3, items=[ExerciseRef(id="", reps=10, rest_sec=30)])],
+            )
             container = self.app.query_one("#main-container")
             container.remove_children()
             editor = SequenceEditorScreen(workout_path=None, id="editor")
@@ -68,10 +68,11 @@ class EditorPickerScreen(Container):
             editor._render_counter = 0
             container.mount(editor)
             self.app._current_screen = "editor"
-        elif event.button.id and event.button.id.startswith("edit-"):
-            path = getattr(event.button, "_workout_path", None)
+        elif getattr(event.button, "_workout_path", None) is not None:
+            path = event.button._workout_path
             if path and path.exists():
                 from scarab.editor.sequence_editor import SequenceEditorScreen
+
                 container = self.app.query_one("#main-container")
                 container.remove_children()
                 container.mount(SequenceEditorScreen(workout_path=path, id="editor"))

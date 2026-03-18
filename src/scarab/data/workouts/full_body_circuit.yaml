@@ -1,42 +1,60 @@
 name: Full Body Circuit
-loops:
-  - label: Warmup
+items:
+  - type: superset
+    label: Warmup
     sets: 1
-    exercises:
-      - id: jumping_jacks
+    items:
+      - type: exercise
+        id: jumping_jacks
+        sets: 1
         reps: 20
         rest_sec: 30
         notes: ''
-      - id: high_knees
+      - type: exercise
+        id: high_knees
+        sets: 1
         reps: 15
         rest_sec: 15
         notes: ''
-  - label: Main Sets
+  - type: superset
+    label: Main Sets
     sets: 3
-    exercises:
-      - id: pushups
+    items:
+      - type: exercise
+        id: pushups
+        sets: 1
         reps: 10
         rest_sec: 45
         notes: ''
-      - id: mountain_climbers
+      - type: exercise
+        id: mountain_climbers
+        sets: 1
         reps: 15
         rest_sec: 30
         notes: ''
-  - label: 5 Sets All Levels
+  - type: superset
+    label: Burnout
     sets: 5
-    exercises:
-      - id: burpees
+    items:
+      - type: exercise
+        id: burpees
+        sets: 1
         reps: 8
         rest_sec: 60
         notes: ''
-  - label: Cooldown
+  - type: superset
+    label: Cooldown
     sets: 2
-    exercises:
-      - id: toe_touches
+    items:
+      - type: exercise
+        id: toe_touches
+        sets: 1
         reps: 10
         rest_sec: 15
         notes: ''
-      - id: quad_stretch
+      - type: exercise
+        id: quad_stretch
+        sets: 1
         reps: 5
         rest_sec: 20
         notes: ''

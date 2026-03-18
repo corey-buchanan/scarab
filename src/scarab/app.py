@@ -48,20 +48,7 @@ class ScarabApp(App):
 
     CSS_PATH = str(Path(__file__).parent / "styles" / "scarab.css")
 
-    CSS = """
-    Screen {
-        layout: vertical;
-    }
-    #main-container {
-        height: 1fr;
-        padding: 1 2;
-    }
-    #welcome-text, #editor-placeholder, #playback-placeholder, #library-placeholder {
-        padding: 2;
-        width: 100%;
-        height: auto;
-    }
-    """
+    CSS = ""
 
     TITLE = "Scarab"
 
