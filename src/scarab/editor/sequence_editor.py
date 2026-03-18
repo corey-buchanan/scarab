@@ -46,6 +46,7 @@ class SequenceEditorScreen(Container):
         self.workout = self._load_or_new(workout_path)
         self._catalog = load_exercise_catalog()
         self._candidates = catalog_autocomplete_items(self._catalog)
+        self._render_counter = 0
 
     def _load_or_new(self, path: Path | None) -> Workout:
         if path and Path(path).exists():
@@ -78,10 +79,11 @@ class SequenceEditorScreen(Container):
         self._render_loops()
 
     def _render_loops(self) -> None:
+        self._render_counter += 1
         container = self.query_one("#loops-container", ScrollableContainer)
         container.remove_children()
         for i, loop in enumerate(self.workout.loops):
-            section = LoopSection(loop, self._candidates, i, id=f"loop-{i}")
+            section = LoopSection(loop, self._candidates, i, id=f"loop-{i}-r{self._render_counter}")
             container.mount(section)
 
     def _collect_workout(self) -> Workout:
@@ -98,19 +100,20 @@ class SequenceEditorScreen(Container):
         elif event.button.id == "save-workout":
             self._save()
         elif event.button.id == "back":
-            self.app.action_home()
+            self.app.action_editor_picker()
         elif event.button.id == "add-exercise":
             from scarab.models.workout import ExerciseRef
-            section = event.button.ancestor(LoopSection)
+            section = event.button.query_ancestor(LoopSection)
             if section:
                 content = section.query_one("#loop-content", Vertical)
                 buttons_row = event.button.parent
                 row = ExerciseRow(ExerciseRef(id="", reps=10, rest_sec=30), self._candidates)
                 content.mount(row, before=buttons_row)
         elif event.button.id == "remove-loop":
-            section = event.button.ancestor(LoopSection)
-            if section:
-                idx = int(section.id.split("-")[1]) if section.id else 0
+            section = event.button.query_ancestor(LoopSection)
+            if section and section.id:
+                parts = section.id.split("-")
+                idx = int(parts[1]) if len(parts) >= 2 else 0
                 self.workout.loops.pop(idx)
                 self._render_loops()
         elif event.button.id == "remove-exercise":

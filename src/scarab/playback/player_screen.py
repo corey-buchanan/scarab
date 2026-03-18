@@ -26,7 +26,7 @@ class PlaybackScreen(Container):
         height: 1fr;
     }
     #playback-header { height: auto; padding: 1 0; }
-    #playback-animation {
+    .playback-animation {
         height: 1fr;
         min-height: 10;
         overflow: hidden;
@@ -41,36 +41,34 @@ class PlaybackScreen(Container):
         self.engine: PlaybackEngine | None = None
         self._catalog = load_exercise_catalog()
         self._level = 1
+        self._playback_counter = 0
 
     def compose(self):
         from textual.app import ComposeResult
 
         yield Vertical(
-            Label("Playback — Select workout and level", id="playback-header"),
-            Static("(Load a workout to start)", id="playback-placeholder"),
+            Label("", id="playback-header"),
+            Static("(Click Start to begin)", id="playback-placeholder"),
             id="playback-content",
         )
         yield Horizontal(
-            Button("Load workout", id="load-workout"),
             Button("Start (Level 1)", id="start-playback"),
             Button("Back (h)", id="back"),
             id="playback-controls",
         )
 
     def on_mount(self) -> None:
-        # Try to load first workout from library
         if self.workout_path and self.workout_path.exists():
             self._load_workout(self.workout_path)
-        else:
-            workouts = list(WORKOUTS_DIR.glob("*.yaml"))
-            if workouts:
-                self._load_workout(workouts[0])
 
     def _load_workout(self, path: Path) -> None:
         self.workout = Workout.from_yaml(path)
         self.workout_path = path
-        header = self.query_one("#playback-header", Label)
-        header.update(f"Ready: {self.workout.name}")
+        try:
+            header = self.query_one("#playback-header", Label)
+            header.update(f"Ready: {self.workout.name} — click Start")
+        except Exception:
+            pass
 
     def _start_playback(self) -> None:
         if not self.workout:
@@ -81,6 +79,8 @@ class PlaybackScreen(Container):
         self._replace_content_with_playback(item)
 
     def _replace_content_with_playback(self, item: PlaybackItem | None) -> None:
+        self._playback_counter += 1
+        c = self._playback_counter
         content = self.query_one("#playback-content", Vertical)
         content.remove_children()
         if item is None:
@@ -89,20 +89,21 @@ class PlaybackScreen(Container):
         ex = item.exercise
         catalog_ex = get_exercise_by_id(self._catalog, ex.id)
         static = catalog_ex.static if catalog_ex else False
-        anim = AnimationWidget(ex.id, static=static, id="playback-animation")
+        anim = AnimationWidget(ex.id, static=static, id=f"playback-animation-{c}", classes="playback-animation")
         label_text = f"{ex.id}: {ex.reps} reps"
+        if ex.rest_sec > 0:
+            label_text += f" (rest {ex.rest_sec}s after)"
         if item.loop_label:
             label_text = f"[{item.loop_label}] Set {item.set_num} — {label_text}"
         content.mount(Vertical(
-            Label(label_text, id="exercise-label"),
+            Label(label_text, id=f"exercise-label-{c}"),
             anim,
-            id="playback-animation-container",
+            id=f"playback-animation-container-{c}",
         ))
         content.mount(Horizontal(
-            Button("Next", id="next-exercise"),
-            Button("Skip", id="skip-exercise"),
+            Button("Next", id="next-exercise", tooltip="Complete and advance"),
             Button("Pause", id="pause-playback"),
-            id="playback-buttons",
+            id=f"playback-buttons-{c}",
         ))
 
     def _show_complete(self) -> None:
@@ -126,18 +127,11 @@ class PlaybackScreen(Container):
         content.mount(Button("Back", id="back-from-complete"))
 
     def on_button_pressed(self, event) -> None:
-        if event.button.id == "load-workout":
-            workouts = list(WORKOUTS_DIR.glob("*.yaml"))
-            if workouts:
-                self._load_workout(workouts[0])
-                self.notify(f"Loaded {self.workout.name}")
-            else:
-                self.notify("No workouts found", severity="warning")
-        elif event.button.id == "start-playback":
+        if event.button.id == "start-playback":
             self._start_playback()
         elif event.button.id == "back" or event.button.id == "back-from-complete":
-            self.app.action_home()
-        elif event.button.id == "next-exercise" or event.button.id == "skip-exercise":
+            self.app.action_workouts()
+        elif event.button.id == "next-exercise":
             if self.engine:
                 item = self.engine.next_item()
                 if self.engine.is_complete():

@@ -35,7 +35,7 @@ class PlaybackProgress:
 
 
 def build_playback_items(workout: Workout, level: int) -> list[PlaybackItem]:
-    """Flatten workout into ordered items for playback."""
+    """Flatten workout into ordered items for playback. Exercises only (no rest steps)."""
     items: list[PlaybackItem] = []
     for loop in workout.loops:
         sets_count = loop.get_sets_for_level(level)
@@ -47,13 +47,6 @@ def build_playback_items(workout: Workout, level: int) -> list[PlaybackItem]:
                     exercise=ex,
                     is_rest=False,
                 ))
-                if ex.rest_sec > 0:
-                    items.append(PlaybackItem(
-                        loop_label=loop.label,
-                        set_num=s,
-                        exercise=ex,
-                        is_rest=True,
-                    ))
     return items
 
 

@@ -67,4 +67,4 @@ class Workout(BaseModel):
         yaml.indent(mapping=2, sequence=4, offset=2)
         with open(path, "w") as f:
             data = getattr(self, "model_dump", lambda **kw: self.dict(**kw))(exclude_none=True)
-        yaml.dump(data, f)
+            yaml.dump(data, f)

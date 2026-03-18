@@ -26,23 +26,21 @@ PYTHONPATH=src python -m scarab.app
 
 ## Features
 
-- **Sequence Editor** (e): Script-based editor with autocomplete, multi-loop support, per-level sets
+- **Sequence Editor** (e): Load or create workouts, multi-loop support, per-level sets
 - **ASCII Animations**: Exercise animations (small/medium/large) for viewport sizing
-- **Playback** (p): Play workouts with timer, animations, and stat tracking
-- **Library** (l): Pick from saved workouts
+- **Workouts** (w): List workouts, select one, hit Start to play
 - **Stats**: Points, XP, character leveling on completion
 
 ## Keyboard Shortcuts
 
 - `h` - Home
-- `e` - Editor
-- `p` - Playback
-- `l` - Library
+- `e` - Editor (pick workout to edit or create new)
+- `w` - Workouts (select workout, Start to play)
 - `q` - Quit
 
 ## ASCII Frame Generator
 
-Generate ASCII frames from Darebee screenshots or images:
+Generate ASCII frames from line images:
 
 ```bash
 python -m scarab.tools.ascii_generator -i screenshot.png -o src/scarab/data/frames/exercise_id --size medium

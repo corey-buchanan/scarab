@@ -1,41 +1,42 @@
-name: "Full Body Circuit"
+name: Full Body Circuit
 loops:
-  - label: "Warmup"
+  - label: Warmup
     sets: 1
     exercises:
       - id: jumping_jacks
         reps: 20
         rest_sec: 30
+        notes: ''
       - id: high_knees
         reps: 15
-        rest_sec: 20
-
-  - label: "Main Sets"
-    sets:
-      1: 3
-      2: 5
-      3: 7
+        rest_sec: 15
+        notes: ''
+  - label: Main Sets
+    sets: 3
     exercises:
       - id: pushups
         reps: 10
         rest_sec: 45
+        notes: ''
       - id: mountain_climbers
         reps: 15
         rest_sec: 30
-
-  - label: "5 Sets All Levels"
+        notes: ''
+  - label: 5 Sets All Levels
     sets: 5
     exercises:
       - id: burpees
         reps: 8
         rest_sec: 60
-
-  - label: "Cooldown"
+        notes: ''
+  - label: Cooldown
     sets: 2
     exercises:
       - id: toe_touches
         reps: 10
         rest_sec: 15
+        notes: ''
       - id: quad_stretch
         reps: 5
         rest_sec: 20
+        notes: ''

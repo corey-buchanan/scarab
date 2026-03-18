@@ -34,14 +34,14 @@ PlaybackScreen {
     background: $surface;
 }
 
-#playback-animation {
+.playback-animation {
     border: tall $primary;
     padding: 1;
     align: center middle;
 }
 
-/* Library */
-LibraryScreen {
+/* Workouts */
+WorkoutsScreen {
     background: $surface;
 }
 

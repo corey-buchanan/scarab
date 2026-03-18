@@ -1,7 +1,7 @@
 """Per-loop block: label, sets config, exercise list."""
 
-from textual.containers import Collapsible, Horizontal, Vertical
-from textual.widgets import Button, Input, Label, Static
+from textual.containers import Horizontal, Vertical
+from textual.widgets import Button, Collapsible, Input, Label
 from textual_autocomplete import AutoComplete, DropdownItem
 
 from scarab.models.workout import ExerciseRef, Loop
@@ -14,10 +14,11 @@ class ExerciseRow(Horizontal):
     ExerciseRow {
         height: auto;
         padding: 0 1;
+        min-width: 60;
     }
-    ExerciseRow .exercise-id-input { width: 20; }
-    ExerciseRow .reps-input { width: 6; }
-    ExerciseRow .rest-input { width: 6; }
+    ExerciseRow .exercise-id-input { width: 28; min-width: 20; }
+    ExerciseRow .reps-input { width: 10; min-width: 8; }
+    ExerciseRow .rest-input { width: 10; min-width: 8; }
     """
 
     def __init__(self, ref: ExerciseRef, candidates: list[str], **kwargs) -> None:

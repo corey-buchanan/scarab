@@ -16,8 +16,8 @@ class WelcomeScreen(Static):
 
     def compose(self) -> ComposeResult:
         yield Static(
-            "[bold]Scarab Workout Sequencer[/bold]\n\n"
-            "Press [bold]e[/] for Editor  |  [bold]p[/] for Playback  |  [bold]l[/] for Library  |  [bold]q[/] to quit",
+            "[bold]Scarab Workouts[/bold]\n\n"
+            "Press [bold]e[/] for Editor  |  [bold]w[/] for Workouts  |  [bold]q[/] to quit",
             id="welcome-text",
         )
 
@@ -37,16 +37,16 @@ class PlaybackPlaceholder(Static):
 
 
 class LibraryPlaceholder(Static):
-    """Placeholder for workout library (Phase 4)."""
+    """Placeholder fallback."""
 
     def compose(self) -> ComposeResult:
-        yield Static("Workout Library — Phase 4", id="library-placeholder")
+        yield Static("Workouts (placeholder)", id="library-placeholder")
 
 
 class ScarabApp(App):
     """Main Scarab TUI application."""
 
-    CSS_PATH = Path(__file__).parent / "styles" / "scarab.css"
+    CSS_PATH = str(Path(__file__).parent / "styles" / "scarab.css")
 
     CSS = """
     Screen {
@@ -68,8 +68,7 @@ class ScarabApp(App):
     BINDINGS = [
         Binding("h", "home", "Home", show=True),
         Binding("e", "editor", "Editor", show=True),
-        Binding("p", "playback", "Playback", show=True),
-        Binding("l", "library", "Library", show=True),
+        Binding("w", "workouts", "Workouts", show=True),
         Binding("q", "quit", "Quit", show=True),
     ]
 
@@ -99,39 +98,28 @@ class ScarabApp(App):
         self._current_screen = screen_id
 
     def action_editor(self) -> None:
-        """Switch to editor screen. Phase 2 will replace placeholder."""
-        from scarab.editor.sequence_editor import SequenceEditorScreen
+        """Switch to editor picker, then sequence editor."""
+        from scarab.screens.editor_picker_screen import EditorPickerScreen
 
         try:
             container = self.query_one("#main-container")
             container.remove_children()
-            container.mount(SequenceEditorScreen(id="editor"))
-            self._current_screen = "editor"
+            container.mount(EditorPickerScreen(id="editor-picker"))
+            self._current_screen = "editor-picker"
         except ImportError:
             self._show_screen("editor", EditorPlaceholder)
 
-    def action_playback(self) -> None:
-        """Switch to playback screen."""
-        from scarab.playback.player_screen import PlaybackScreen
+    def action_workouts(self) -> None:
+        """Switch to workouts screen."""
+        from scarab.screens.workouts_screen import WorkoutsScreen
 
         try:
             container = self.query_one("#main-container")
             container.remove_children()
-            container.mount(PlaybackScreen(id="playback"))
-            self._current_screen = "playback"
+            container.mount(WorkoutsScreen(id="workouts"))
+            self._current_screen = "workouts"
         except ImportError:
-            self._show_screen("playback", PlaybackPlaceholder)
-
-    def action_library(self) -> None:
-        """Switch to library screen."""
-        from scarab.screens.library_screen import LibraryScreen
-        try:
-            container = self.query_one("#main-container")
-            container.remove_children()
-            container.mount(LibraryScreen(id="library"))
-            self._current_screen = "library"
-        except ImportError:
-            self._show_screen("library", LibraryPlaceholder)
+            self._show_screen("workouts", LibraryPlaceholder)
 
     def action_home(self) -> None:
         """Return to home screen."""
@@ -139,6 +127,14 @@ class ScarabApp(App):
         container.remove_children()
         container.mount(WelcomeScreen(id="welcome"))
         self._current_screen = "home"
+
+    def action_editor_picker(self) -> None:
+        """Return to editor picker (from within editor)."""
+        from scarab.screens.editor_picker_screen import EditorPickerScreen
+        container = self.query_one("#main-container")
+        container.remove_children()
+        container.mount(EditorPickerScreen(id="editor-picker"))
+        self._current_screen = "editor-picker"
 
     def action_quit(self) -> None:
         """Quit the app."""
