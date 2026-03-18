@@ -1,4 +1,4 @@
-name: Full Body Circuit
+name: Sample Workout
 items:
   - type: superset
     label: Warmup
@@ -20,6 +20,17 @@ items:
     label: Main Sets
     sets: 3
     items:
+      - type: superset
+        label: Torture
+        sets: 3
+        items:
+          - type: exercise
+            id: burpees
+            sets: 1
+            reps: 1
+            rest_sec: 30
+            notes: ''
+            hold_sec: 10
       - type: exercise
         id: pushups
         sets: 1

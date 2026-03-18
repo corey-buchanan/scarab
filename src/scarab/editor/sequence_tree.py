@@ -4,27 +4,15 @@ from rich.style import Style
 from rich.text import Text
 
 from textual import events
-from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import Tree
 
 
-class ReorderUp(Message):
-    """Request to move selected item up. Bubbles to parent."""
-    pass
-
-
-class ReorderDown(Message):
-    """Request to move selected item down. Bubbles to parent."""
-    pass
-
-
 class DropItem(Message):
-    """Request to move item from source_path to target_path. Bubbles to parent."""
-    def __init__(self, source_path: tuple[int, ...], target_path: tuple[int, ...], drop_as_child: bool) -> None:
+    """Request to move item from source_path; insert before target_path (same level, or at end if __end__)."""
+    def __init__(self, source_path: tuple[int, ...], target_path: tuple[int, ...]) -> None:
         self.source_path = source_path
         self.target_path = target_path
-        self.drop_as_child = drop_as_child
         super().__init__()
 
 
@@ -33,15 +21,6 @@ class SequenceTree(Tree):
 
     ICON_NODE = ""
     ICON_NODE_EXPANDED = ""
-
-    BINDINGS = [*Tree.BINDINGS] + [
-        Binding("alt+up", "move_up", "Move up", show=False),
-        Binding("alt+down", "move_down", "Move down", show=False),
-        Binding("option+up", "move_up", show=False),
-        Binding("option+down", "move_down", show=False),
-        Binding("ctrl+up", "move_up", show=False),
-        Binding("ctrl+down", "move_down", show=False),
-    ]
 
     DEFAULT_CSS = """
     SequenceTree .tree--guides {
@@ -63,12 +42,6 @@ class SequenceTree(Tree):
             if node_line == self.hover_line:
                 return Text.assemble("▸ ", node_label)
         return Text.assemble(node_label)
-
-    def action_move_up(self) -> None:
-        self.post_message(ReorderUp())
-
-    def action_move_down(self) -> None:
-        self.post_message(ReorderDown())
 
     def _get_line_from_event(self, event: events.MouseEvent) -> int:
         """Extract line number from event style meta, hover_line, or y offset."""
@@ -103,29 +76,28 @@ class SequenceTree(Tree):
         line = self._get_line_from_event(event)
         if line >= 0:
             node = self.get_node_at_line(line)
-            if node is not None and hasattr(node, "_path") and node._path is not None:
+            path = getattr(node, "_path", None)
+            # Don't drag blank rows (__end__) or root
+            if path is not None and "__end__" not in path:
                 self._drag_node = node
                 self._drag_line = line
+                self.capture_mouse()
 
     def on_mouse_up(self, event: events.MouseUp) -> None:
         if self._drag_node is None:
             return
+        self.release_mouse()
         source_path = getattr(self._drag_node, "_path", None)
         if source_path is None:
             self._drag_node = None
             self._drag_line = -1
             return
-        line = self._get_line_from_event(event)
+        line = self.hover_line if self.hover_line >= 0 else self._get_line_from_event(event)
         target_path = self._get_path_from_line(line)
-        node = self.get_node_at_line(line)
         self._drag_node = None
         self._drag_line = -1
-        if target_path is None and node != self.root:
+        if target_path is None:
             return
         if source_path == target_path:
             return
-        # drop_as_child: root or superset (has children)
-        drop_as_child = node == self.root or (node is not None and hasattr(node, "_children") and len(node._children) > 0)
-        if target_path is None:
-            target_path = ()
-        self.post_message(DropItem(source_path, target_path, drop_as_child))
+        self.post_message(DropItem(source_path, target_path))

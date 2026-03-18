@@ -1,14 +1,14 @@
 """Exercise row and super-set detail widgets."""
 
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Collapsible, Input, Label
+from textual.widgets import Button, Collapsible, Input, Label, Select
 from textual_autocomplete import AutoComplete, DropdownItem
 
 from scarab.models.workout import ExerciseRef, SuperSet
 
 
 class ExerciseRow(Horizontal):
-    """Single exercise row: id (autocomplete), reps, rest, optional sets."""
+    """Single exercise row: id (autocomplete), reps or timed, rest, optional sets."""
 
     DEFAULT_CSS = """
     ExerciseRow {
@@ -16,9 +16,13 @@ class ExerciseRow(Horizontal):
         padding: 0 1;
     }
     ExerciseRow .exercise-id-input { width: 28; min-width: 15; }
-    ExerciseRow .reps-input { width: 10; min-width: 6; }
-    ExerciseRow .rest-input { width: 10; min-width: 6; }
-    ExerciseRow .sets-input { width: 6; min-width: 4; }
+    ExerciseRow .reps-input { width: 15; min-width: 10; }
+    ExerciseRow .seconds-input { width: 15; min-width: 10; }
+    ExerciseRow .rest-input { width: 15; min-width: 10; }
+    ExerciseRow .sets-input { width: 15; min-width: 10; }
+    ExerciseRow .mode-select { width: 14; }
+    ExerciseRow .reps-row.hidden { display: none; }
+    ExerciseRow .timed-row.hidden { display: none; }
     """
 
     def __init__(
@@ -33,12 +37,13 @@ class ExerciseRow(Horizontal):
         self.ref = ref
         self.candidates = candidates
         self.show_sets = show_sets
+        self._is_timed = ref.hold_sec is not None and ref.hold_sec > 0
 
     def compose(self):
         from textual.app import ComposeResult
 
         inp = Input(
-            value=self.ref.id,
+            value=self.ref.id or "",
             placeholder="Exercise...",
             classes="exercise-id-input",
         )
@@ -53,35 +58,52 @@ class ExerciseRow(Horizontal):
                 type="integer",
                 classes="sets-input",
             )
-        yield Label("reps:")
-        yield Input(
-            value=str(self.ref.reps),
-            placeholder="10",
-            type="integer",
-            classes="reps-input",
+        yield Label("Type:")
+        yield Select(
+            [("Reps", "reps"), ("Timed (seconds)", "timed")],
+            value="timed" if self._is_timed else "reps",
+            classes="mode-select",
         )
+        reps_val = str(self.ref.reps)
+        sec_val = str(self.ref.hold_sec or 30)
+        with Horizontal(classes="reps-row" + (" hidden" if self._is_timed else "")):
+            yield Label("reps:")
+            yield Input(value=reps_val, placeholder="10", type="integer", classes="reps-input")
+        with Horizontal(classes="timed-row" + (" hidden" if not self._is_timed else "")):
+            yield Label("sec:")
+            yield Input(value=sec_val, placeholder="30", type="integer", classes="seconds-input")
         yield Label("rest:")
         yield Input(
-            value=str(self.ref.rest_sec),
-            placeholder="30",
+            value="" if self.ref.rest_sec == 0 else str(self.ref.rest_sec),
+            placeholder="0",
             type="integer",
+            valid_empty=True,
             classes="rest-input",
         )
-        yield Button("−", id="remove-exercise", variant="warning")
+        yield Button("Remove", id="remove-exercise", variant="warning")
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        value = str(event.value) if event.value is not None else "reps"
+        is_timed = value == "timed"
+        reps_row = self.query_one(".reps-row", Horizontal)
+        timed_row = self.query_one(".timed-row", Horizontal)
+        if is_timed:
+            reps_row.add_class("hidden")
+            timed_row.remove_class("hidden")
+        else:
+            reps_row.remove_class("hidden")
+            timed_row.add_class("hidden")
 
     def get_ref(self) -> ExerciseRef:
         """Build ExerciseRef from current inputs."""
         id_inp = self.query_one(".exercise-id-input", Input)
-        reps_inp = self.query_one(".reps-input", Input)
         rest_inp = self.query_one(".rest-input", Input)
+        mode_select = self.query_one(".mode-select", Select)
+        mode = str(mode_select.value) if mode_select.value is not None else "reps"
         try:
-            reps = max(1, int(reps_inp.value or "10"))
+            rest_sec = int(rest_inp.value or "0")
         except ValueError:
-            reps = 10
-        try:
-            rest_sec = int(rest_inp.value or "30")
-        except ValueError:
-            rest_sec = 30
+            rest_sec = 0
         sets_val = 1
         if self.show_sets:
             sets_inp = self.query_one(".sets-input", Input)
@@ -89,12 +111,32 @@ class ExerciseRow(Horizontal):
                 sets_val = max(1, int(sets_inp.value or "1"))
             except ValueError:
                 sets_val = 1
-        return ExerciseRef(
-            id=id_inp.value.strip() or "unknown",
-            sets=sets_val,
-            reps=reps,
-            rest_sec=rest_sec,
-        )
+        if mode == "timed":
+            sec_inp = self.query_one(".seconds-input", Input)
+            try:
+                hold_sec = max(1, int(sec_inp.value or "30"))
+            except ValueError:
+                hold_sec = 30
+            return ExerciseRef(
+                id=id_inp.value.strip() or "",
+                sets=sets_val,
+                reps=1,
+                rest_sec=rest_sec,
+                hold_sec=hold_sec,
+            )
+        else:
+            reps_inp = self.query_one(".reps-input", Input)
+            try:
+                reps = max(1, int(reps_inp.value or "10"))
+            except ValueError:
+                reps = 10
+            return ExerciseRef(
+                id=id_inp.value.strip() or "",
+                sets=sets_val,
+                reps=reps,
+                rest_sec=rest_sec,
+                hold_sec=None,
+            )
 
 
 class LoopSection(Collapsible):

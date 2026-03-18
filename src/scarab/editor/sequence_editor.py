@@ -5,7 +5,7 @@ from pathlib import Path
 from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
 from textual.widgets import Button, Input, Label, Static, Tree
 from scarab.data import WORKOUTS_DIR
-from scarab.editor.sequence_tree import DropItem, ReorderDown, ReorderUp, SequenceTree
+from scarab.editor.sequence_tree import DropItem, SequenceTree
 from scarab.data.loader import catalog_autocomplete_items, load_exercise_catalog
 from scarab.models.workout import ExerciseRef, SuperSet, Workout, WorkoutItem
 from scarab.editor.loop_section import ExerciseRow
@@ -53,15 +53,85 @@ def _parent_path(path: tuple[int, ...]) -> tuple[int, ...] | None:
     return path[:-1]
 
 
-def _path_for_index(
-    tgt_path: tuple[int, ...], insert_idx: int, drop_as_child: bool
+def _is_end_path(path: tuple[int, ...]) -> bool:
+    """True if path is a blank-row 'insert at end' marker."""
+    return bool(path and path[-1] == "__end__")
+
+
+def _get_insert_parent_and_index(
+    workout: Workout, path: tuple[int, ...]
+) -> tuple[list[WorkoutItem], int] | None:
+    """Get (parent_list, insert_index) for inserting before the given path. Handles __end__ paths."""
+    if not path:
+        return (workout.items, 0)
+    if path == ("__end__",):
+        return (workout.items, len(workout.items))
+    if path[-1] == "__end__":
+        # Path like (i, "__end__") or (i, j, "__end__") - insert at end of that superset
+        parent_path = path[:-1]
+        items: list[WorkoutItem] = workout.items
+        for idx in parent_path:
+            if idx < 0 or idx >= len(items):
+                return None
+            item = items[idx]
+            if not isinstance(item, SuperSet):
+                return None
+            items = item.items
+        return (items, len(items))
+    # Normal path: insert before this item
+    info = _get_parent_and_index(workout, path)
+    if info is None:
+        return None
+    return info
+
+
+def _format_exercise_label(item: ExerciseRef) -> str:
+    """Format exercise for tree: (empty), reps or timed, rest only if > 0, set/sets."""
+    name = item.id or "(empty)"
+    if item.hold_sec and item.hold_sec > 0:
+        amount = f"{item.hold_sec}s"
+    else:
+        amount = f"×{item.reps}"
+    rest_part = f" rest {item.rest_sec}s" if item.rest_sec and item.rest_sec > 0 else ""
+    label = f"{name} {amount}{rest_part}"
+    if item.sets > 1:
+        label += f" ({item.sets} sets)"
+    return label
+
+
+def _format_superset_suffix(sets: int, rest: int) -> str:
+    """Format superset suffix with correct set/sets pluralization, omit rest if 0."""
+    s = "set" if sets == 1 else "sets"
+    rest_part = f", {rest}s rest" if rest else ""
+    return f" ({sets} {s}{rest_part})"
+
+
+def _has_blank_exercise_ids(workout: Workout) -> bool:
+    """Return True if any ExerciseRef has empty id."""
+
+    def check(items: list[WorkoutItem]) -> bool:
+        for item in items:
+            if isinstance(item, ExerciseRef):
+                if not (item.id or "").strip():
+                    return True
+            elif isinstance(item, SuperSet):
+                if check(item.items):
+                    return True
+        return False
+
+    return check(workout.items)
+
+
+def _path_for_inserted_item(
+    workout: Workout, parent_list: list[WorkoutItem], insert_idx: int
 ) -> tuple[int, ...]:
-    """Compute path of inserted item after drop."""
-    if drop_as_child:
-        return tgt_path + (insert_idx,)
-    if not tgt_path:
+    """Compute path of item after inserting into parent_list at insert_idx."""
+    if parent_list is workout.items:
         return (insert_idx,)
-    return tgt_path[:-1] + (insert_idx,)
+    for i, item in enumerate(workout.items):
+        if isinstance(item, SuperSet) and item.items is parent_list:
+            return (i, insert_idx)
+    return (insert_idx,)  # fallback
 
 
 class SequenceEditorScreen(Container):
@@ -158,29 +228,49 @@ class SequenceEditorScreen(Container):
         root.label = self.workout.name
         root.expand()
 
-        def add_children(parent_node, items: list[WorkoutItem], base_path: tuple[int, ...]) -> None:
+        def add_children(parent_node, items: list[WorkoutItem], superset_path: tuple[int, ...]) -> None:
+            """Add items to parent_node. base_path is path to this superset (for blank row)."""
             for i, item in enumerate(items):
-                path = base_path + (i,)
+                path = superset_path + (i,)
                 if isinstance(item, ExerciseRef):
-                    label = f"{item.id or '(empty)'} ×{item.reps} rest {item.rest_sec}s"
-                    if item.sets > 1:
-                        label += f" ({item.sets} sets)"
+                    label = _format_exercise_label(item)
                     node = parent_node.add_leaf(label)
                 else:
                     fixed = list(item.sets.values())[0] if isinstance(item.sets, dict) else item.sets
                     rest = item.rest_between_sets or 0
                     label = item.label or f"Super-set"
-                    suffix = f" ({fixed} sets" + (f", {rest}s rest" if rest else "") + ")"
+                    suffix = _format_superset_suffix(fixed, rest)
                     node = parent_node.add(f"{label}{suffix}", expand=True, allow_expand=False)
                     add_children(node, item.items, path)
+                    end_node = node.add_leaf("")
+                    end_node._path = path + ("__end__",)  # type: ignore
                 node._path = path  # type: ignore
 
-        add_children(root, self.workout.items, ())
+        items = self.workout.items
+        for i, item in enumerate(items):
+            path = (i,)
+            if isinstance(item, ExerciseRef):
+                label = _format_exercise_label(item)
+                node = root.add_leaf(label)
+            else:
+                fixed = list(item.sets.values())[0] if isinstance(item.sets, dict) else item.sets
+                rest = item.rest_between_sets or 0
+                label = item.label or f"Super-set"
+                suffix = _format_superset_suffix(fixed, rest)
+                node = root.add(f"{label}{suffix}", expand=True, allow_expand=False)
+                add_children(node, item.items, path)
+                end_node = node.add_leaf("")
+                end_node._path = (i, "__end__")  # type: ignore  # path is (i,) for top-level superset
+            node._path = path  # type: ignore
+        end_node = root.add_leaf("")
+        end_node._path = ("__end__",)  # type: ignore
 
     def _persist_current_detail(self) -> None:
         """Persist detail form into workout model at _selected_path. Call before switching selection."""
         if self._selected_path is None:
             return
+        if _is_end_path(self._selected_path):
+            return  # Nothing to persist for blank row
         item = _get_item_at_path(self.workout, self._selected_path)
         parent_info = _get_parent_and_index(self.workout, self._selected_path)
         if item is None or parent_info is None:
@@ -222,7 +312,12 @@ class SequenceEditorScreen(Container):
 
         if self._selected_path is None:
             content.mount(Static("Select an exercise or super-set in the tree.", classes="detail-section"))
-            content.mount(Static("Drag items to reorder or move in/out of super-sets. Ctrl+↑/↓ to reorder.", classes="detail-section"))
+            content.mount(Static("Drag items to reorder. Use + Exercise / + Super-set to add at same level.", classes="detail-section"))
+            return
+
+        if _is_end_path(self._selected_path):
+            content.mount(Static("Insert at end.", classes="detail-section"))
+            content.mount(Static("Drop items here or use + Exercise / + Super-set to add.", classes="detail-section"))
             return
 
         item = _get_item_at_path(self.workout, self._selected_path)
@@ -234,12 +329,6 @@ class SequenceEditorScreen(Container):
             is_standalone = _parent_path(self._selected_path) is None
             content.mount(Label("Exercise", classes="detail-section"))
             content.mount(ExerciseRow(item, self._candidates, show_sets=is_standalone))
-            content.mount(
-                Horizontal(
-                    Button("Remove", id="remove-item", variant="warning"),
-                    classes="detail-row",
-                )
-            )
         elif isinstance(item, SuperSet):
             fixed = list(item.sets.values())[0] if isinstance(item.sets, dict) else item.sets
             rest_val = item.rest_between_sets or 0
@@ -258,7 +347,13 @@ class SequenceEditorScreen(Container):
             ))
             section.mount(Horizontal(
                 Label("Rest between sets:"),
-                Input(value=str(rest_val), type="integer", placeholder="0", classes="superset-rest"),
+                Input(
+                    value="" if rest_val == 0 else str(rest_val),
+                    type="integer",
+                    placeholder="0",
+                    valid_empty=True,
+                    classes="superset-rest",
+                ),
                 classes="detail-row",
             ))
             content.mount(
@@ -310,8 +405,11 @@ class SequenceEditorScreen(Container):
         new_path = getattr(node, "_path", None)
         if new_path is None:
             return
-        # Validate path still exists (node may be stale after drag/rebuild)
-        if _get_item_at_path(self.workout, new_path) is None:
+        # Validate: real item exists, or valid __end__ path
+        if _is_end_path(new_path):
+            if _get_insert_parent_and_index(self.workout, new_path) is None:
+                return
+        elif _get_item_at_path(self.workout, new_path) is None:
             return
         # Persist current before switching
         self._persist_current_detail()
@@ -319,25 +417,28 @@ class SequenceEditorScreen(Container):
         self._update_detail()
 
     def _add_exercise_or_superset(self, is_superset: bool) -> None:
-        """Add exercise or superset at root, or into selected superset."""
+        """Add exercise or superset at same level as selection, just below it (or at end if blank row)."""
         self._persist_current_detail()
+        insert_info = None
         if self._selected_path is not None:
-            item = _get_item_at_path(self.workout, self._selected_path)
-            if isinstance(item, SuperSet):
-                if is_superset:
-                    item.items.append(SuperSet(sets=3, items=[ExerciseRef(id="", reps=10, rest_sec=30)]))
-                    self._selected_path = self._selected_path + (len(item.items) - 1,)
-                else:
-                    item.items.append(ExerciseRef(id="", reps=10, rest_sec=30))
-                    self._selected_path = self._selected_path + (len(item.items) - 1,)
-                self._rebuild_and_reselect()
-                return
-        # Add at root
-        if is_superset:
-            self.workout.items.append(SuperSet(sets=3, items=[ExerciseRef(id="", reps=10, rest_sec=30)]))
-        else:
-            self.workout.items.append(ExerciseRef(id="", sets=1, reps=10, rest_sec=30))
-        self._selected_path = (len(self.workout.items) - 1,)
+            insert_info = _get_insert_parent_and_index(self.workout, self._selected_path)
+            if insert_info is not None and _is_end_path(self._selected_path):
+                # Blank row: insert at end (already correct from _get_insert_parent_and_index)
+                pass
+            elif insert_info is not None:
+                # Real item: insert below it (index + 1)
+                parent_list, idx = insert_info
+                insert_info = (parent_list, idx + 1)
+        if insert_info is None:
+            insert_info = (self.workout.items, len(self.workout.items))
+        parent_list, insert_idx = insert_info
+        new_item: WorkoutItem = (
+            SuperSet(sets=3, items=[ExerciseRef(id="", reps=10, rest_sec=30)])
+            if is_superset
+            else ExerciseRef(id="", sets=1, reps=10, rest_sec=30)
+        )
+        parent_list.insert(insert_idx, new_item)
+        self._selected_path = _path_for_inserted_item(self.workout, parent_list, insert_idx)
         self._rebuild_and_reselect()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -351,6 +452,9 @@ class SequenceEditorScreen(Container):
             return
         if btn_id == "save-workout":
             self._persist_current_detail()
+            if _has_blank_exercise_ids(self.workout):
+                self.notify("Cannot save: all exercises must have a name.", severity="error")
+                return
             name_inp = self.query_one("#workout-name-input", Input) if self.query("#workout-name-input") else None
             if name_inp:
                 self.workout.name = name_inp.value.strip() or self.workout.name
@@ -391,94 +495,41 @@ class SequenceEditorScreen(Container):
                 if parent_info:
                     parent_list, idx = parent_info
                     parent_list.pop(idx)
-                    self._selected_path = _parent_path(self._selected_path)
-                    if idx > 0:
-                        self._selected_path = (self._selected_path or ()) + (idx - 1,)
+                    p_path = _parent_path(self._selected_path)
+                    if p_path is not None:
+                        if parent_list:
+                            new_idx = min(idx, len(parent_list) - 1)
+                            self._selected_path = p_path + (new_idx,)
+                        else:
+                            self._selected_path = p_path
+                    else:
+                        self._selected_path = (0,) if self.workout.items else None
                     self._rebuild_and_reselect()
 
-    def _handle_move_up(self) -> None:
-        """Move selected item up (Alt+Up)."""
-        if self._selected_path is None:
-            return
-        parent_info = _get_parent_and_index(self.workout, self._selected_path)
-        if parent_info is None:
-            return
-        parent_list, idx = parent_info
-        if idx <= 0:
-            return
-        self._persist_current_detail()
-        parent_list[idx], parent_list[idx - 1] = parent_list[idx - 1], parent_list[idx]
-        self._selected_path = self._selected_path[:-1] + (idx - 1,)
-        self._rebuild_and_reselect()
-
-    def _handle_move_down(self) -> None:
-        """Move selected item down (Alt+Down)."""
-        if self._selected_path is None:
-            return
-        parent_info = _get_parent_and_index(self.workout, self._selected_path)
-        if parent_info is None:
-            return
-        parent_list, idx = parent_info
-        if idx >= len(parent_list) - 1:
-            return
-        self._persist_current_detail()
-        parent_list[idx], parent_list[idx + 1] = parent_list[idx + 1], parent_list[idx]
-        self._selected_path = self._selected_path[:-1] + (idx + 1,)
-        self._rebuild_and_reselect()
-
-    def on_reorder_up(self, _event: ReorderUp) -> None:
-        """Handle Alt+Up from SequenceTree."""
-        self._handle_move_up()
-
-    def on_reorder_down(self, _event: ReorderDown) -> None:
-        """Handle Ctrl/Alt+Down from SequenceTree."""
-        self._handle_move_down()
-
     def on_drop_item(self, event: DropItem) -> None:
-        """Handle drag-drop: move item from source to target."""
+        """Handle drag-drop: insert source before target (same level). Target can be __end__ for insert-at-end."""
         self._persist_current_detail()
         src_path = event.source_path
         tgt_path = event.target_path
-        drop_as_child = event.drop_as_child
         if not src_path:
             return
         # Prevent dropping parent into its own descendant
-        if drop_as_child and tgt_path and len(tgt_path) >= len(src_path) and tgt_path[: len(src_path)] == src_path:
+        if tgt_path and len(tgt_path) >= len(src_path) and tgt_path[: len(src_path)] == src_path:
             return
         src_info = _get_parent_and_index(self.workout, src_path)
         src_item = _get_item_at_path(self.workout, src_path)
         if src_info is None or src_item is None:
             return
+        insert_info = _get_insert_parent_and_index(self.workout, tgt_path)
+        if insert_info is None:
+            return
         src_parent, src_idx = src_info
+        tgt_parent, insert_idx = insert_info
         src_parent.pop(src_idx)
-        if drop_as_child:
-            if not tgt_path:
-                tgt_parent = self.workout.items
-                insert_idx = len(tgt_parent)
-            else:
-                tgt_item = _get_item_at_path(self.workout, tgt_path)
-                if not isinstance(tgt_item, SuperSet):
-                    src_parent.insert(src_idx, src_item)
-                    self._rebuild_and_reselect()
-                    return
-                tgt_parent = tgt_item.items
-                insert_idx = len(tgt_parent)
-        else:
-            if not tgt_path:
-                tgt_parent = self.workout.items
-                insert_idx = 0
-            else:
-                tgt_info = _get_parent_and_index(self.workout, tgt_path)
-                if tgt_info is None:
-                    src_parent.insert(src_idx, src_item)
-                    self._rebuild_and_reselect()
-                    return
-                tgt_parent, tgt_idx = tgt_info
-                insert_idx = tgt_idx
-                if src_parent is tgt_parent and src_idx < tgt_idx:
-                    insert_idx = tgt_idx - 1
+        if src_parent is tgt_parent and src_idx < insert_idx:
+            insert_idx -= 1
         tgt_parent.insert(insert_idx, src_item)
-        self._selected_path = _path_for_index(tgt_path, insert_idx, drop_as_child)
+        self._selected_path = _path_for_inserted_item(self.workout, tgt_parent, insert_idx)
         self._suppress_node_selected = True  # Drop will trigger NodeSelected from click; ignore it
         self._rebuild_and_reselect()
 
